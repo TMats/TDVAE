@@ -12,10 +12,20 @@ class TDVAE(nn.Module):
         self.c_size = c_size
         
         self.belief_state_net = nn.LSTMCell(x_size, b_size)
-        self.p_b = Filtering()
+        
+        # distributions
+        self.p_b1 = Filtering()
+        self.p_b2 = self.p_b1.replace_var(b_t1="b_t2", z_t1="z_t2")
         self.p_t = Transition()
         self.q = Inference()
         self.p_d = Decoder()
+        
+        # losses
+        self.kl = KullbackLeibler(self.q, self.p_b1)
+        self.b_ll = -NLL(self.p_b2)
+        self.t_nll = NLL(self.p_t)
+        self.d_nll = NLL(self.p_d)
+        self.loss_cls = (self.kl+self.b_ll+self.t_nll+self.d_nll).mean()
     
     def forward(self, batch):
         batch_size, seq_len, *_ = batch.size()
@@ -25,29 +35,28 @@ class TDVAE(nn.Module):
         b = batch.new_zeros((batch_size, self.b_size))
         c = batch.new_zeros((batch_size, self.c_size))
         
+        # make belief states
         for t in range(seq_len):
             x = batch[:,t]
             b, c = self.belief_state_net(x, (b,c))
             belief_states.append(b)
-        loss = 0
-        
+            
+        loss = 0    
         # sample every timestep for simplification
         for t in range(seq_len-1):
             x_t2 = batch[:,t+1]
-            z_t2 = self.p_b.sample({"b": belief_states[t+1]}, reparam=True)["z"]
-            z_t1 = self.q.sample({"z_t2": z_t2, "b_t1": belief_states[t], "b_t2": belief_states[t+1]}, reparam=True)["z_t1"]
-            kl = KullbackLeibler(self.q, self.p_b).estimate({"z_t2": z_t2,
-                                                             "b_t1": belief_states[t],
-                                                             "b_t2": belief_states[t+1],
-                                                             "b": belief_states[t]})
-            b_ll = -NLL(self.p_b).estimate({"z": z_t2, "b": belief_states[t+1]})
-            t_nll = NLL(self.p_t).estimate({"z_t2": z_t2, "z_t1": z_t1})
-            d_nll = NLL(self.p_d).estimate({"x_t2": x_t2, "z_t2": z_t2})
-            loss += (kl+b_ll+t_nll+d_nll)
-            
+            z_t2 = self.p_b2.sample({"b_t2": belief_states[t+1]}, reparam=True)["z_t2"]
+            z_t1 = self.q.sample({"z_t2": z_t2, 
+                                  "b_t1": belief_states[t], 
+                                  "b_t2": belief_states[t+1]}, reparam=True)["z_t1"]
+            loss += self.loss_cls.estimate({"x_t2": x_t2,
+                                            "z_t1": z_t1,
+                                            "z_t2": z_t2,
+                                            "b_t1": belief_states[t],
+                                            "b_t2": belief_states[t+1]})
         return loss
     
-    def generate(self, batch):
+    def test(self, batch):
         batch_size, seq_len, C, H, W = batch.size()
         batch = batch.view(batch_size, seq_len, -1)
         belief_states = []
@@ -61,10 +70,31 @@ class TDVAE(nn.Module):
             b, c = self.belief_state_net(x, (b,c))
             belief_states.append(b)
         
-        test_reconst = batch.clone()
+        # evaluate each loss
+        kl, b_ll, t_nll, d_nll = 0, 0, 0, 0
         for t in range(seq_len-1):
-            z_t1 = self.p_b.sample({"b": belief_states[t]}, reparam=True)["z"]
-            z_t2 = self.p_t.sample({"z_t1": z_t1}, reparam=True)["z_t2"]
+            x_t2 = batch[:,t+1]
+            z_t2 = self.p_b2.sample({"b_t2": belief_states[t+1]}, reparam=True)["z_t2"]
+            z_t1 = self.q.sample({"z_t2": z_t2, 
+                                  "b_t1": belief_states[t], 
+                                  "b_t2": belief_states[t+1]}, reparam=True)["z_t1"]
+            kl += self.kl.estimate({"z_t2": z_t2,
+                                    "b_t1": belief_states[t],
+                                    "b_t2": belief_states[t+1]}).mean()
+            b_ll += self.b_ll.estimate({"z_t2": z_t2,
+                                        "b_t2": belief_states[t+1]}).mean()
+            t_nll += self.t_nll.estimate({"z_t2": z_t2,
+                                          "z_t1": z_t1}).mean()
+            d_nll += self.d_nll.estimate({"x_t2": x_t2,
+                                          "z_t2": z_t2}).mean()
+        
+        # prediction
+        test_pred = batch.clone()
+        for t in range(seq_len-1):
+            z_t1 = self.p_b1.sample({"b_t1": belief_states[t]})["z_t1"]
+            z_t2 = self.p_t.sample({"z_t1": z_t1})["z_t2"]
             x_t2_hat = self.p_d.sample_mean({"z_t2": z_t2}) # batch_size*C*H*W
-            test_reconst[:,t+1] = x_t2_hat
-        return test_reconst.view(batch_size, seq_len, C, H, W)
+            test_pred[:,t+1] = x_t2_hat
+        test_pred = torch.clamp(test_pred.view(batch_size, seq_len, C, H, W), 0, 1)
+        
+        return kl, b_ll, t_nll, d_nll, test_pred

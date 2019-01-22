@@ -11,13 +11,13 @@ from model import TDVAE
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Temporal Difference Variational Auto-Encoder Implementation')
-    parser.add_argument('--gradient_steps', type=int, default=1*10**3, help='number of gradient steps to run')
+    parser.add_argument('--gradient_steps', type=int, default=2*10**4, help='number of gradient steps to run')
     parser.add_argument('--batch_size', type=int, default=32, help='size of batch (default: 32)')
     parser.add_argument('--data_path', type=str, help='location of dataset', default='data/mnist_test_seq.npy')
     parser.add_argument('--root_log_dir', type=str, help='root location of log', default='../log/TDVAE/')
     parser.add_argument('--log_dir', type=str, help='log directory', default=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    parser.add_argument('--log_interval', type=int, help='interval number of steps for logging', default=100)
-    parser.add_argument('--save_interval', type=int, help='interval number of steps for saveing models', default=10)
+    parser.add_argument('--log_interval', type=int, help='interval number of steps for logging', default=200)
+    parser.add_argument('--save_interval', type=int, help='interval number of steps for saveing models', default=1000)
     parser.add_argument('--workers', type=int, help='number of data loading workers', default=0)
     parser.add_argument('--seed', type=int, help='random seed (default: None)', default=None)
     args = parser.parse_args()
@@ -64,16 +64,20 @@ if __name__ == '__main__':
         batch = batch.to(device)
         
         loss = model(batch)
-        (loss.mean()).backward()
-        writer.add_scalar('train_loss', loss.mean(), itr)
+        loss.backward()
+        writer.add_scalar('train_loss', loss, itr)
         optimizer.step()
         optimizer.zero_grad()
         
         with torch.no_grad():
             if itr % log_interval_num == 0:
-                test_loss = model(test_batch)
-                writer.add_scalar('test_loss', test_loss.mean(), itr)
-                test_reconst = model.generate(test_batch)
-                writer.add_video('test_reconst', test_reconst, itr)
+                kl, b_ll, t_nll, d_nll, test_pred = model.test(test_batch)
+                test_loss = kl + b_ll + t_nll +d_nll
+                writer.add_scalar('test_loss', test_loss, itr)
+                writer.add_scalar('test_kl', kl, itr)
+                writer.add_scalar('test_b_ll', b_ll, itr)
+                writer.add_scalar('test_t_nll', t_nll, itr)
+                writer.add_scalar('test_d_nll', d_nll, itr)
+                writer.add_video('test_pred', test_pred, itr)
 
     writer.close()
