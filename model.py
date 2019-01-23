@@ -5,16 +5,32 @@ from torch import nn
 from distribution import Filtering, Transition, Inference, Decoder
 
 
+class BeliefStateNet(nn.Module):
+    def __init__(self, x_size, processed_x_size, b_size):
+        super(BeliefStateNet, self).__init__()
+        self.fc1 = nn.Linear(x_size, processed_x_size)
+        self.fc2 = nn.Linear(processed_x_size, processed_x_size)
+        self.rnn = nn.LSTMCell(processed_x_size, b_size)
+
+    def forward(self, x, states):
+        b, c = states
+        h = torch.relu(self.fc1(x))
+        h = torch.relu(self.fc2(h))
+        b, c = self.rnn(h, (b, c))
+        return b, c
+
+
 class TDVAE(nn.Module):
-    def __init__(self, seq_len=16, b_size=50, x_size=1*64*64, c_size=50, z_size=8):
+    def __init__(self, seq_len=16, b_size=50, x_size=1*64*64, processed_x_size=1*64*64, c_size=50, z_size=8):
         super(TDVAE, self).__init__()
         
         self.b_size = b_size
         self.x_size = x_size
+        self.processed_x_size = processed_x_size
         self.c_size = c_size
         self.z_size = z_size
         
-        self.belief_state_net = nn.LSTMCell(x_size, b_size)
+        self.belief_state_net = BeliefStateNet(self.x_size, self.processed_x_size, self.b_size)
         
         # distributions
         self.p_b1 = Filtering(b_size=self.b_size, z_size=self.z_size)
@@ -29,20 +45,23 @@ class TDVAE(nn.Module):
         self.d_nll = NLL(self.p_d)
         self.loss_cls = (self.kl_1+self.kl_2+self.d_nll).mean()
     
-    def forward(self, batch):
+    def rollout_belief(self, batch):
         batch_size, seq_len, *_ = batch.size()
-        batch = batch.view(batch_size, seq_len, -1)
         belief_states = []
-        # initialize
         b = batch.new_zeros((batch_size, self.b_size))
         c = batch.new_zeros((batch_size, self.c_size))
-        
-        # make belief states
         for t in range(seq_len):
             x = batch[:,t]
             b, c = self.belief_state_net(x, (b,c))
             belief_states.append(b)
-            
+        return belief_states
+        
+    
+    def forward(self, batch):
+        batch_size, seq_len, *_ = batch.size()
+        batch = batch.view(batch_size, seq_len, -1)
+        belief_states = self.rollout_belief(batch)
+        
         loss = 0    
         # sample every timestep for simplification
         for t in range(seq_len-1):
@@ -61,16 +80,7 @@ class TDVAE(nn.Module):
     def test(self, batch):
         batch_size, seq_len, C, H, W = batch.size()
         batch = batch.view(batch_size, seq_len, -1)
-        belief_states = []
-        
-        # initialize
-        b = batch.new_zeros((batch_size, self.b_size))
-        c = batch.new_zeros((batch_size, self.c_size))
-        
-        for t in range(seq_len):
-            x = batch[:,t]
-            b, c = self.belief_state_net(x, (b,c))
-            belief_states.append(b)
+        belief_states = self.rollout_belief(batch)
         
         # evaluate each loss
         kl_1, kl_2, d_nll = 0, 0, 0
