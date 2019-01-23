@@ -19,11 +19,13 @@ if __name__ == '__main__':
     parser.add_argument('--log_interval', type=int, help='interval number of steps for logging', default=200)
     parser.add_argument('--save_interval', type=int, help='interval number of steps for saveing models', default=1000)
     parser.add_argument('--workers', type=int, help='number of data loading workers', default=0)
-    parser.add_argument('--seed', type=int, help='random seed (default: None)', default=None)
+    parser.add_argument('--seed', type=int, help='random seed (default: None)', default=1234)
+    parser.add_argument('--device_ids', type=int, nargs='+', help='list of CUDA devices (default: [0])', default=[0])
+    parser.add_argument('--z_size', type=int, help='size of latent space(z)', default=8)
     args = parser.parse_args()
     
     # Device
-    device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
+    device = f"cuda:{args.device_ids[0]}" if torch.cuda.is_available() else "cpu"
     
     # Seed
     if args.seed!=None:
@@ -51,8 +53,9 @@ if __name__ == '__main__':
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     test_loader_iterator = iter(test_loader)
     test_batch = next(test_loader_iterator).to(device)
-
-    model = TDVAE().to(device)
+    
+    z_size = args.z_size
+    model = TDVAE(z_size=z_size).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
 
     for itr in tqdm(range(args.gradient_steps)):
@@ -71,12 +74,11 @@ if __name__ == '__main__':
         
         with torch.no_grad():
             if itr % log_interval_num == 0:
-                kl, b_ll, t_nll, d_nll, test_pred = model.test(test_batch)
-                test_loss = kl + b_ll + t_nll +d_nll
+                kl_1, kl_2, d_nll, test_pred = model.test(test_batch)
+                test_loss = kl_1 + kl_2 +d_nll
                 writer.add_scalar('test_loss', test_loss, itr)
-                writer.add_scalar('test_kl', kl, itr)
-                writer.add_scalar('test_b_ll', b_ll, itr)
-                writer.add_scalar('test_t_nll', t_nll, itr)
+                writer.add_scalar('test_kl_1', kl_1, itr)
+                writer.add_scalar('test_kl_2', kl_2, itr)
                 writer.add_scalar('test_d_nll', d_nll, itr)
                 writer.add_video('test_pred', test_pred, itr)
 
