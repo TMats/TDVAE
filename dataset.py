@@ -6,9 +6,10 @@ from torchvision import transforms
 # https://github.com/proceduralia/tgan-pytorch/blob/master/dataset.py
 
 class MovingMNIST(Dataset):
-    def __init__(self, dataset_path, n_frames=16, norm_mean=0, norm_std=1):
+    def __init__(self, dataset_path, n_frames=16, norm_mean=0, norm_std=1, transform=None):
         self.norm_mean = norm_mean
         self.norm_std = norm_std
+        self.transform = transform
 
         self.data = torch.from_numpy(np.float32(np.load(dataset_path)))
         #Dataset will be of the form (L, T, C, H, W)
@@ -27,6 +28,8 @@ class MovingMNIST(Dataset):
         ot = np.random.randint(T - self.n_frames) if T > self.n_frames else 0
         x = self.data[i, ot:(ot + self.n_frames)]
         x = self.normalize(x)
+        if self.transform:
+            x = self.transform(x)
         return x
 
 

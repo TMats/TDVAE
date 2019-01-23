@@ -4,6 +4,7 @@ from torch import nn
 
 from distribution import Filtering, Transition, Inference, Decoder
 
+
 class TDVAE(nn.Module):
     def __init__(self, seq_len=16, b_size=50, x_size=1*64*64, c_size=50, z_size=8):
         super(TDVAE, self).__init__()

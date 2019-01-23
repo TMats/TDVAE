@@ -10,6 +10,7 @@ from tqdm import tqdm
 from dataset import MovingMNIST
 from model import TDVAE
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Temporal Difference Variational Auto-Encoder Implementation')
     parser.add_argument('--gradient_steps', type=int, default=2*10**4, help='number of gradient steps to run')
@@ -23,6 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, help='random seed (default: None)', default=1234)
     parser.add_argument('--device_ids', type=int, nargs='+', help='list of CUDA devices (default: [0])', default=[0])
     parser.add_argument('--z_size', type=int, help='size of latent space(z)', default=8)
+    parser.add_argument('--lr', type=float, default=5e-4, help='learning rate')
     args = parser.parse_args()
     
     # Device
@@ -56,8 +58,9 @@ if __name__ == '__main__':
     test_batch = next(test_loader_iterator).to(device)
     
     z_size = args.z_size
+    lr = args.lr
     model = TDVAE(z_size=z_size).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     for itr in tqdm(range(args.gradient_steps)):
         try:
@@ -82,5 +85,6 @@ if __name__ == '__main__':
                 writer.add_scalar('test_kl_2', kl_2, itr)
                 writer.add_scalar('test_d_nll', d_nll, itr)
                 writer.add_video('test_pred', test_pred, itr)
+                writer.add_video('test_ground_truth', test_batch, itr)
 
     writer.close()
