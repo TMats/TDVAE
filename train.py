@@ -25,7 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--device_ids', type=int, nargs='+', help='list of CUDA devices (default: [0])', default=[0])
     parser.add_argument('--z_size', type=int, help='size of latent space(z)', default=8)
     parser.add_argument('--lr', type=float, default=5e-4, help='learning rate')
-    parser.add_argument('--resize_scale', type=float, help='resize scale of input', default=None)
+    parser.add_argument('--rescale', type=float, help='resize scale of input', default=None)
     args = parser.parse_args()
     
     # Device
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     # Dataset
     if args.dataset_type == 'MovingMNIST':
         data_path = 'data/mnist_test_seq.npy'
-        full_dataset = MovingMNIST(data_path, resize_scale=args.resize_scale)
+        full_dataset = MovingMNIST(data_path, rescale=args.rescale)
     elif args.dataset_type == 'MovingMNISTLR':
         # TODO: make dataset
         raise NotImplementedError()

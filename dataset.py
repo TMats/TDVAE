@@ -6,7 +6,7 @@ from torchvision import transforms
 
 # https://github.com/proceduralia/tgan-pytorch/blob/master/dataset.py
 class MovingMNIST(Dataset):
-    def __init__(self, dataset_path, n_frames=16, norm_mean=0, norm_std=1, resize_scale=None):
+    def __init__(self, dataset_path, n_frames=16, norm_mean=0, norm_std=1, rescale=None):
         self.norm_mean = norm_mean
         self.norm_std = norm_std
 
@@ -14,8 +14,8 @@ class MovingMNIST(Dataset):
         #Dataset will be of the form (L, T, C, H, W)
         self.data = self.data.permute(1, 0, 2, 3).unsqueeze(2)
         # rescale if specified
-        if resize_scale:
-            self.data = interpolate(self.data, scale_factor=(1, resize_scale, resize_scale))
+        if rescale:
+            self.data = interpolate(self.data, scale_factor=(1, rescale, rescale))
         self.n_frames = n_frames #This can't be greater than 20
         
         #self.normalize = transforms.Normalize(self.norm_mean, self.norm_std)
