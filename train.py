@@ -48,11 +48,15 @@ if __name__ == '__main__':
     # Dataset
     if args.dataset_type == 'MovingMNIST':
         data_path = 'data/mnist_test_seq.npy'
-        full_dataset = MovingMNIST(data_path)
+        full_dataset = MovingMNIST(data_path, resize_scale=args.resize_scale)
+    elif args.dataset_type == 'MovingMNISTLR':
+        # TODO: make dataset
+        raise NotImplementedError()
     else:
         raise NotImplementedError()
-    train_size = int(0.9 * len(full_dataset))
-    test_size = len(full_dataset) - train_size
+    data_num, seq_len, C, H, W = full_dataset.data.size()
+    train_size = int(0.9 * data_num)
+    test_size = data_num - train_size
     train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
     
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
@@ -62,7 +66,7 @@ if __name__ == '__main__':
     test_loader_iterator = iter(test_loader)
     test_batch = next(test_loader_iterator).to(device)
     
-    model = TDVAE(z_size=args.z_size).to(device)
+    model = TDVAE(z_size=args.z_size, x_size=C*H*W, processed_x_size=C*H*W).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     for itr in tqdm(range(args.gradient_steps)):
