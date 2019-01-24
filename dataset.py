@@ -4,7 +4,6 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 # https://github.com/proceduralia/tgan-pytorch/blob/master/dataset.py
-
 class MovingMNIST(Dataset):
     def __init__(self, dataset_path, n_frames=16, norm_mean=0, norm_std=1, transform=None):
         self.norm_mean = norm_mean
@@ -34,7 +33,7 @@ class MovingMNIST(Dataset):
 
 
 if __name__ == "__main__":
-    dset = MovingMNIST("mnist_test_seq.npy")
+    dset = MovingMNIST("data/mnist_test_seq.npy")
     zero = dset[0]
     print(type(zero))
     print(zero.size())

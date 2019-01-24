@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Temporal Difference Variational Auto-Encoder Implementation')
     parser.add_argument('--gradient_steps', type=int, default=2*10**4, help='number of gradient steps to run')
     parser.add_argument('--batch_size', type=int, default=32, help='size of batch (default: 32)')
-    parser.add_argument('--data_path', type=str, help='location of dataset', default='data/mnist_test_seq.npy')
+    parser.add_argument('--dataset_type', type=str, help='type of dataset', default='MovingMNIST')
     parser.add_argument('--root_log_dir', type=str, help='root location of log', default='../log/TDVAE/')
     parser.add_argument('--log_dir', type=str, help='log directory', default=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     parser.add_argument('--log_interval', type=int, help='interval number of steps for logging', default=200)
@@ -25,6 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--device_ids', type=int, nargs='+', help='list of CUDA devices (default: [0])', default=[0])
     parser.add_argument('--z_size', type=int, help='size of latent space(z)', default=8)
     parser.add_argument('--lr', type=float, default=5e-4, help='learning rate')
+    parser.add_argument('--resize_scale', type=float, help='resize scale of input', default=None)
     args = parser.parse_args()
     
     # Device
@@ -45,7 +46,11 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=os.path.join(log_dir,'runs'))
     
     # Dataset
-    full_dataset = MovingMNIST(args.data_path)
+    if args.dataset_type == 'MovingMNIST':
+        data_path = 'data/mnist_test_seq.npy'
+        full_dataset = MovingMNIST(data_path)
+    else:
+        raise NotImplementedError()
     train_size = int(0.9 * len(full_dataset))
     test_size = len(full_dataset) - train_size
     train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
@@ -57,10 +62,8 @@ if __name__ == '__main__':
     test_loader_iterator = iter(test_loader)
     test_batch = next(test_loader_iterator).to(device)
     
-    z_size = args.z_size
-    lr = args.lr
-    model = TDVAE(z_size=z_size).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    model = TDVAE(z_size=args.z_size).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     for itr in tqdm(range(args.gradient_steps)):
         try:
