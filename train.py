@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dataset import MovingMNIST
+from dataset import MovingMNIST, MovingMNISTLR
 from model import TDVAE
 
 
@@ -17,6 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=32, help='size of batch (default: 32)')
     parser.add_argument('--dataset_type', type=str, help='type of dataset', default='MovingMNIST')
     parser.add_argument('--root_log_dir', type=str, help='root location of log', default='../log/TDVAE/')
+    parser.add_argument('--data_dir', type=str, help='root location of dataset', default='data')
     parser.add_argument('--log_dir', type=str, help='log directory', default=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     parser.add_argument('--log_interval', type=int, help='interval number of steps for logging', default=200)
     parser.add_argument('--save_interval', type=int, help='interval number of steps for saveing models', default=1000)
@@ -47,25 +48,24 @@ if __name__ == '__main__':
     
     # Dataset
     if args.dataset_type == 'MovingMNIST':
-        data_path = 'data/mnist_test_seq.npy'
+        data_path = os.path.join(args.data_dir, 'mnist_test_seq.npy')
         full_dataset = MovingMNIST(data_path, rescale=args.rescale)
+        data_num =  len(full_dataset)
+        train_size = int(0.9 * data_num)
+        test_size = data_num - train_size
+        train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
     elif args.dataset_type == 'MovingMNISTLR':
-        # TODO: make dataset
-        raise NotImplementedError()
+        train_dataset = MovingMNISTLR(args.data_dir, train=True, download=True)
+        test_dataset = MovingMNISTLR(args.data_dir, train=False, download=True)
     else:
         raise NotImplementedError()
-    data_num, seq_len, C, H, W = full_dataset.data.size()
-    train_size = int(0.9 * data_num)
-    test_size = data_num - train_size
-    train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
-    
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     train_loader_iterator = iter(train_loader)
-    
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     test_loader_iterator = iter(test_loader)
     test_batch = next(test_loader_iterator).to(device)
-    
+    _, _, C, H, W = test_batch.size()
+
     model = TDVAE(z_size=args.z_size, x_size=C*H*W, processed_x_size=C*H*W).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
