@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Temporal Difference Variational Auto-Encoder Implementation')
     parser.add_argument('--gradient_steps', type=int, default=2*10**4, help='number of gradient steps to run')
     parser.add_argument('--batch_size', type=int, default=32, help='size of batch (default: 32)')
-    parser.add_argument('--dataset_type', type=str, help='type of dataset', default='MovingMNIST')
+    parser.add_argument('--dataset_type', type=str, help='type of dataset', default='MovingMNISTLR')
     parser.add_argument('--root_log_dir', type=str, help='root location of log', default='../log/TDVAE/')
     parser.add_argument('--data_dir', type=str, help='root location of dataset', default='data')
     parser.add_argument('--log_dir', type=str, help='log directory', default=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     parser.add_argument('--device_ids', type=int, nargs='+', help='list of CUDA devices (default: [0])', default=[0])
     parser.add_argument('--z_size', type=int, help='size of latent space(z)', default=8)
     parser.add_argument('--lr', type=float, default=5e-4, help='learning rate')
-    parser.add_argument('--rescale', type=float, help='resize scale of input', default=None)
+    parser.add_argument('--rescale', type=float, help='resize scale of input (valid for MovingMNIST only)', default=None)
     args = parser.parse_args()
     
     # Device
