@@ -89,7 +89,6 @@ if __name__ == '__main__':
                 test_loss = kl + b_ll + t_nll +d_nll
                 writer.add_scalar('test_loss', test_loss, itr)
                 writer.add_scalar('test_kl', kl, itr)
-                # writer.add_scalar('test_kl_2', kl_2, itr)
                 writer.add_scalar('test_b_ll', b_ll, itr)
                 writer.add_scalar('test_t_nll', t_nll, itr)
                 writer.add_scalar('test_d_nll', d_nll, itr)
