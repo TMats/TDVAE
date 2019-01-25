@@ -85,11 +85,12 @@ if __name__ == '__main__':
         
         with torch.no_grad():
             if itr % log_interval_num == 0:
-                kl_1, kl_2, d_nll, test_pred = model.test(test_batch)
-                test_loss = kl_1 + kl_2 +d_nll
+                test_pred, kl, b_ll, t_nll, d_nll = model.test(test_batch)
+                test_loss = kl + b_ll + t_nll +d_nll
                 writer.add_scalar('test_loss', test_loss, itr)
-                writer.add_scalar('test_kl_1', kl_1, itr)
-                writer.add_scalar('test_kl_2', kl_2, itr)
+                writer.add_scalar('test_kl', kl, itr)
+                writer.add_scalar('test_b_ll', b_ll, itr)
+                writer.add_scalar('test_t_nll', t_nll, itr)
                 writer.add_scalar('test_d_nll', d_nll, itr)
                 writer.add_video('test_pred', test_pred, itr)
                 writer.add_video('test_ground_truth', test_batch, itr)
