@@ -113,3 +113,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# dataset
+*.pt
+*.npy
+data/raw
+
