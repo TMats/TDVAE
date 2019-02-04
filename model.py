@@ -49,12 +49,14 @@ class TDVAE(Model):
         self.q = Inference(b_size=self.b_size, z_size=self.z_size).to(device)
         self.p_d = Decoder(x_size=self.x_size, z_size=self.z_size).to(device)
         self.belief_state_net = BeliefStateNet(self.x_size, self.processed_x_size, self.b_size).to(device)
-
         self.slice_step = SliceStep()
+
+        self.pred_next_step = self.p_t * self.p_b1 * self.slice_step
 
         # losses
         self.kl = KullbackLeibler(self.q, self.p_b1)
-        self.reconst = LossExpectation(self.q,  NLL(self.p_t) + NLL(self.p_d) - NLL(self.p_b2))
+        self.reconst = LossExpectation(self.q,  NLL(self.p_t) + NLL(self.p_d)
+                                       - NLL(self.p_b2))
         self.step_loss = LossExpectation(self.p_b2, self.reconst + self.kl)
 
         self._loss = IterativeLoss(self.step_loss, max_iter=seq_len-1,
@@ -62,21 +64,21 @@ class TDVAE(Model):
                                    slice_step=self.slice_step)
         self.loss = LossExpectation(self.belief_state_net, self._loss).mean()
 
-        super(TDVAE, self).__init__(loss=self.loss, distributions=[self.p_b1, self.p_b2, self.p_t, self.q, self.p_d,
+        super(TDVAE, self).__init__(loss=self.loss, distributions=[self.p_b1, self.p_b2, self.p_t, self.p_d, self.q,
                                                                    self.belief_state_net],
                                     **kwargs)
     
     def pred(self, batch):
         seq_len, batch_size, C, H, W = batch.size()
         batch = batch.view(seq_len, batch_size, -1)
-        belief_states = self.belief_state_net(batch)
+        samples = self.belief_state_net.sample({"x": batch})
 
         # prediction
         test_pred = batch.clone()
         for t in range(seq_len-1):
-            z_t1 = self.p_b1.sample({"b_t1": belief_states["b"][t]})["z_t1"]
-            z_t2 = self.p_t.sample({"z_t1": z_t1})["z_t2"]
-            x_t2_hat = self.p_d.sample_mean({"z_t2": z_t2})  # (batch_size, C, H, W)
+            samples.update({"t": t})
+            samples = self.pred_next_step.sample(samples)
+            x_t2_hat = self.p_d.sample_mean({"z_t2": samples["z_t2"]})  # (batch_size, C, H, W)
             test_pred[t+1] = x_t2_hat
         test_pred = torch.clamp(test_pred.view(seq_len, batch_size, C, H, W), 0, 1)
         

@@ -68,7 +68,7 @@ if __name__ == '__main__':
     seq_len, _, C, H, W = test_batch.size()
 
     model = TDVAE(seq_len=seq_len, z_size=args.z_size, x_size=C*H*W, processed_x_size=C*H*W,
-                  optimizer=torch.optim.Adam, optimizer_params={"lr": args.lr}, device=device)
+                  optimizer=torch.optim.Adam, optimizer_params={"lr": args.lr}, device=device, clip_grad_value=10)
 
     print(model)
 
