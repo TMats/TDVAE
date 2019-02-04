@@ -50,7 +50,7 @@ if __name__ == '__main__':
     if args.dataset_type == 'MovingMNIST':
         data_path = os.path.join(args.data_dir, 'mnist_test_seq.npy')
         full_dataset = MovingMNIST(data_path, rescale=args.rescale)
-        data_num =  len(full_dataset)
+        data_num = len(full_dataset)
         train_size = int(0.9 * data_num)
         test_size = data_num - train_size
         train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
@@ -64,10 +64,13 @@ if __name__ == '__main__':
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     test_loader_iterator = iter(test_loader)
     test_batch = next(test_loader_iterator).to(device)
-    _, _, C, H, W = test_batch.size()
+    test_batch = test_batch.transpose(0, 1)
+    seq_len, _, C, H, W = test_batch.size()
 
-    model = TDVAE(z_size=args.z_size, x_size=C*H*W, processed_x_size=C*H*W).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    model = TDVAE(seq_len=seq_len, z_size=args.z_size, x_size=C*H*W, processed_x_size=C*H*W,
+                  optimizer=torch.optim.Adam, optimizer_params={"lr": args.lr}, device=device)
+
+    print(model)
 
     for itr in tqdm(range(args.gradient_steps)):
         try:
@@ -76,23 +79,20 @@ if __name__ == '__main__':
             train_loader_iterator = iter(train_loader)
             batch = next(train_loader_iterator)
         batch = batch.to(device)
-        
-        loss = model(batch)
-        loss.backward()
+        batch_size, seq_len, *_ = batch.size()
+        batch = batch.view(batch_size, seq_len, -1)
+        batch = batch.transpose(0, 1)
+
+        loss = model.train({"x": batch})
         writer.add_scalar('train_loss', loss, itr)
-        optimizer.step()
-        optimizer.zero_grad()
-        
+
         with torch.no_grad():
             if itr % log_interval_num == 0:
-                test_pred, kl, b_ll, t_nll, d_nll = model.test(test_batch)
-                test_loss = kl + b_ll + t_nll +d_nll
+                test_pred = model.pred(test_batch)
+                test_loss = model.test({"x": batch.view(seq_len, batch_size, -1)})
+
                 writer.add_scalar('test_loss', test_loss, itr)
-                writer.add_scalar('test_kl', kl, itr)
-                writer.add_scalar('test_b_ll', b_ll, itr)
-                writer.add_scalar('test_t_nll', t_nll, itr)
-                writer.add_scalar('test_d_nll', d_nll, itr)
-                writer.add_video('test_pred', test_pred, itr)
-                writer.add_video('test_ground_truth', test_batch, itr)
+                writer.add_video('test_pred', test_pred.transpose(0, 1), itr)
+                writer.add_video('test_ground_truth', test_batch.transpose(0, 1), itr)
 
     writer.close()
