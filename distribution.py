@@ -23,13 +23,13 @@ class DBlock(nn.Module):
         logsigma = self.fc_logsigma(h)
         return mu, logsigma
 
-    
+
 class Filtering(Normal):
     def __init__(self, b_size=50, h_size=50, z_size=8):
         super(Filtering, self).__init__(cond_var=["b_t1"], var=["z_t1"], name='p_b')
         self.dblock = DBlock(b_size, h_size, z_size)
         
-    def forward(self,b_t1):
+    def forward(self, b_t1):
         mu, logsigma = self.dblock(b_t1)
         std = torch.exp(logsigma)
         return {"loc": mu, "scale": std}
